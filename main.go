@@ -1,14 +1,36 @@
 package main
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"strings"
 	"sync/atomic"
+
+	"github.com/SandeshNarayan/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
+type ChirpRequest struct {
+	Body string `json:"body"`
+}
+
 type apiConfig struct {
-	fileserverHits atomic.Int32
+	fileserverHits atomic.Int32;
+	dbQueries *database.Queries
+}
+
+type ErrorResponse struct{
+	Error string `json:"error"`
+}
+
+type SuccessResponse struct{
+	Cleaned_body string `json:"cleaned_body"`
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -19,14 +41,38 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
+func respondWithError(w http.ResponseWriter, code int, msg string){
+	w.WriteHeader(code)
+	respondWithJson(w, code, ErrorResponse{Error: msg})
+}
+
+func respondWithJson(w http.ResponseWriter, code int, payload interface{}){
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if err:=json.NewEncoder(w).Encode(payload); err!=nil {
+		fmt.Println(err)
+	}
+}
+
 
 func main(){
 	mux := http.NewServeMux()
-	apiCfg := &apiConfig{}
+	
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err!=nil {
+        log.Fatal(err)
+    }
+
+	apiCfg := &apiConfig{
+		dbQueries: database.New(db),
+	}
+
 
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app",http.FileServer(http.Dir(".")) )))
 	
-	mux.HandleFunc("/app/", func(w http.ResponseWriter, r *http.Request){
+	mux.HandleFunc("/app", func(w http.ResponseWriter, r *http.Request){
 		w.Header().Set("Content-Type", "text/plain")
         w.WriteHeader(http.StatusOK)
         _, err := w.Write([]byte("Welcome to Chirpy"))
@@ -95,6 +141,46 @@ func main(){
         }
 	})
 
+	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request){
+		
+		var chirp ChirpRequest
+		err:= json.NewDecoder(r.Body).Decode(&chirp)
+		if err!= nil{
+			respondWithError(w, http.StatusBadRequest, "Invalid JSON body")
+			return
+		}
+
+		new_body :=""
+		words := strings.Split(chirp.Body, " ") 
+		for i, word:= range words {
+			if strings.ToLower(word) == "kerfuffle" || strings.ToLower(word) == "sharbert" || strings.ToLower(word) == "fornax"{
+                words[i] = "****"			
+            }
+			
+		}
+		new_body = strings.Join(words, " ")
+
+
+		body := strings.TrimSpace(new_body)
+
+		if body==""{
+			respondWithError(w, http.StatusBadRequest, "`body` field must not be empty")
+
+			return
+		}
+
+		
+
+		if len(body)>140{
+			respondWithError(w, http.StatusBadRequest, "chirp is too long")
+
+			return
+		}
+
+		respondWithJson(w, http.StatusOK, map[string]string{"cleaned_body": body})
+
+
+	})
 
 	server := &http.Server{
 		Handler : mux,
