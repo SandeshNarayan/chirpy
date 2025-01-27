@@ -22,7 +22,8 @@ type ChirpRequest struct {
 
 type apiConfig struct {
 	fileserverHits atomic.Int32;
-	dbQueries *database.Queries
+	dbQueries *database.Queries;
+	platform string
 }
 
 type ErrorResponse struct{
@@ -67,6 +68,7 @@ func main(){
 
 	apiCfg := &apiConfig{
 		dbQueries: database.New(db),
+		platform: os.Getenv("PLATFORM"),
 	}
 
 
@@ -81,6 +83,7 @@ func main(){
             return
         }
 	})
+
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter,r  *http.Request){
 		
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -91,6 +94,40 @@ func main(){
 			fmt.Println(err)
 			return
 		}
+	} )
+
+	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter,r  *http.Request){
+		
+		w.Header().Set("Content-Type", "application/json")
+
+		var requestBody struct {
+			Email string `json:"email"`
+		}
+		
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err!=nil{
+			respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+            return
+		}
+
+		user, err := apiCfg.dbQueries.CreateUser(r.Context(), requestBody.Email)
+		if err!=nil{
+            respondWithError(w, http.StatusInternalServerError, err.Error())
+            return
+        }
+
+		response:= map[string]interface{}{
+			"id": user.ID,
+			"email": user.Email,
+			"created_at": user.CreatedAt,
+			"updated_at": user.UpdatedAt,
+		}
+		if err!=nil{
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+            return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		respondWithJson(w, http.StatusCreated, response)
 	} )
 
 	mux.HandleFunc("/", func(w http.ResponseWriter,r  *http.Request){
@@ -133,6 +170,18 @@ func main(){
 	mux.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request){
 		
 		apiCfg.fileserverHits.Store(0)
+
+		if apiCfg.platform!="dev"{
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		//delete all users
+		if err:= apiCfg.dbQueries.DeleteAllUsers(r.Context()); err!=nil{
+			http.Error(w,fmt.Sprintf("Failed to reset database: %v",err.Error()), http.StatusInternalServerError )
+			return
+		}
+		
         w.WriteHeader(http.StatusOK)
         _, err := w.Write([]byte("Metrics reset successfully"))
         if err!=nil{
