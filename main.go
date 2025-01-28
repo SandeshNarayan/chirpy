@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/SandeshNarayan/chirpy/internal/database"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -121,10 +122,7 @@ func main(){
 			"created_at": user.CreatedAt,
 			"updated_at": user.UpdatedAt,
 		}
-		if err!=nil{
-			respondWithError(w, http.StatusInternalServerError, err.Error())
-            return
-		}
+		
 
 		w.WriteHeader(http.StatusCreated)
 		respondWithJson(w, http.StatusCreated, response)
@@ -190,9 +188,15 @@ func main(){
         }
 	})
 
-	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request){
+	
+
+	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request){
 		
-		var chirp ChirpRequest
+		
+		var chirp struct{
+			Body string `json:"body"`
+			UserID string `json:"user_id"`
+		}
 		err:= json.NewDecoder(r.Body).Decode(&chirp)
 		if err!= nil{
 			respondWithError(w, http.StatusBadRequest, "Invalid JSON body")
@@ -226,7 +230,36 @@ func main(){
 			return
 		}
 
-		respondWithJson(w, http.StatusOK, map[string]string{"cleaned_body": body})
+		if chirp.UserID =="" || len(chirp.UserID)!=36{
+			respondWithError(w, http.StatusBadRequest, "user_id must be a valid UUID")
+			return 
+		}
+
+		userId , err:=uuid.Parse(chirp.UserID)
+		if err!= nil{
+            respondWithError(w, http.StatusBadRequest, "user_id must be a valid UUID")
+            return 
+        }
+		createdChirp, err := apiCfg.dbQueries.CreateChirp(r.Context(), database.CreateChirpParams{
+			Body: body,
+			UserID: userId,
+		})
+
+		if err!=nil{
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+            return
+		}
+
+		response:= map[string]interface{}{
+			"id": createdChirp.ID,
+            "body": createdChirp.Body,
+            "user_id": createdChirp.UserID,
+            "created_at": createdChirp.CreatedAt,
+            "updated_at": createdChirp.UpdatedAt,
+		}
+
+
+		respondWithJson(w, http.StatusCreated, response)
 
 
 	})

@@ -6,5 +6,6 @@ CREATE TABLE "user" (
     email TEXT NOT NULL UNIQUE
 );
 
+
 -- +goose Down
 DROP TABLE "user";
