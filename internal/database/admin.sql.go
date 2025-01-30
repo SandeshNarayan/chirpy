@@ -10,7 +10,7 @@ import (
 )
 
 const deleteAllUsers = `-- name: DeleteAllUsers :exec
-DELETE FROM "user"
+DELETE FROM users
 `
 
 func (q *Queries) DeleteAllUsers(ctx context.Context) error {

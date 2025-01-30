@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE "user" (
+CREATE TABLE users (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -8,4 +8,4 @@ CREATE TABLE "user" (
 
 
 -- +goose Down
-DROP TABLE "user";
+DROP TABLE users;
