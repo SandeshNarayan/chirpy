@@ -22,6 +22,7 @@ type apiConfig struct {
 	dbQueries *database.Queries;
 	platform string
 	jwtSecret string
+	apiKey string
 }
 
 
@@ -58,11 +59,14 @@ func main(){
 		log.Fatal("JWT_SECRET environment variable is not set")
 	}
 
+	apiKey:=os.Getenv("POLKA_KEY")
+
 	apiCfg := &apiConfig{
 		dbQueries: dbQueries,
 		fileserverHits: atomic.Int32{},
 		platform: platform,
 		jwtSecret: secret,
+		apiKey: apiKey,
 	}
 
 	mux := http.NewServeMux()
@@ -94,7 +98,9 @@ func main(){
 
 	mux.HandleFunc("PUT /api/users", apiCfg.handlerUsersUpdate)
 
-	
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handlerChirpsDelete)
+
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.handlerWebhooksUpdate)
 
 	
 

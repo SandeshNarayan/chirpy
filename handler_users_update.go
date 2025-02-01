@@ -24,11 +24,7 @@ func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request)
         return
     }
 
-	user, err := cfg.dbQueries.GetUserByID(r.Context(), userID)
-	if err!=nil{
-        respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
-        return
-    }
+	
 
 
 	type parameters struct {
@@ -52,7 +48,7 @@ func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request)
 	newUser, err := cfg.dbQueries.UpdateUser(r.Context(), database.UpdateUserParams{
 		Email: params.Email,
 		HashedPassword: HashPassword,
-		ID: user.ID,
+		ID: userID,
     })
 	if err!=nil{
         respondWithError(w, http.StatusInternalServerError, "Couldnt update user", err)
@@ -68,6 +64,7 @@ func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request)
             CreatedAt: newUser.CreatedAt,
             UpdatedAt: newUser.UpdatedAt,
             Email: newUser.Email,
+			IsChirpyRed: newUser.IsChirpyRed,
 		},
 	})
 
