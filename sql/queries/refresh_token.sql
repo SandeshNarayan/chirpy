@@ -12,13 +12,13 @@ RETURNING *;
 
 
 
--- name: GetUserFromRefreshToken :one
+-- name: GetUserFromToken :one
 SELECT * FROM users 
 WHERE id =(
     SELECT user_id 
     FROM refresh_tokens 
     WHERE token = $1 
-    AND expires_at >NOW()
+    AND expires_at > NOW()
     AND revoked_at IS NULL
 );
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/SandeshNarayan/chirpy/internal/auth"
@@ -11,17 +10,13 @@ import (
 
 func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request){
 
-	refreshToken := r.Header.Get("Authorization")
-
-	parts:= strings.SplitN(refreshToken, " ", 2)
-	if len(parts)!=2 || parts[0]!="Bearer"{
-        respondWithError(w, http.StatusUnauthorized, "Invalid token", nil)
+	accessToken, err := auth.GetBearerToken(r.Header)
+	if err!=nil {
+		respondWithError(w, http.StatusUnauthorized, "Missing or invalid token", err)
         return
     }
 
-	token:=parts[1]
-
-	user, err := cfg.dbQueries.GetUserFromRefreshToken(r.Context(), token)
+	user, err := cfg.dbQueries.GetUserFromToken(r.Context(), accessToken)
 	if err!=nil {
 		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
         return

@@ -92,6 +92,8 @@ func main(){
 
 	mux.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
 
+	mux.HandleFunc("PUT /api/users", apiCfg.handlerUsersUpdate)
+
 	
 
 	
